@@ -44,3 +44,18 @@ next 3 items: ['TROPICAL FRUIT', 'COUPON', 'FLUID MILK']
 
 ![First Result](first_result.png)  
 *Sample prediction result*
+
+## 📚 Dataset
+
+The dataset used in this project is the **Dunnhumby - The Complete Journey** dataset, available on Kaggle. This dataset contains household-level transactions over two years from a group of 2,500 households who are frequent shoppers at a retailer. It includes all of each household’s purchases, demographic information, and direct marketing contact history.
+
+### Downloading the Dataset
+1. **Create a Kaggle Account**: If you don't already have one, sign up at [Kaggle](https://www.kaggle.com).
+2. **Download the Dataset**: Navigate to the [Dunnhumby - The Complete Journey](https://www.kaggle.com/datasets/frtgnn/dunnhumby-the-complete-journey) dataset page and download the files.
+3. **Place the Files**: Extract the downloaded files and place them in the `data/` directory of your project.
+
+### Dataset Files
+- `product.csv`: Product details.
+- `transaction_data.csv`: Transaction data.
+
+---
