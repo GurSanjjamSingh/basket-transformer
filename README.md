@@ -1,6 +1,6 @@
 # 🛒 Basket Transformer
 
-*A lightweight, educational GPT-2 model for predicting the next grocery product in a basket.*
+*A lightweight, GPT-2 model for predicting the next grocery product in a basket.*
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/downloads/)  
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x-orange.svg)](https://pytorch.org/)  
