@@ -1,5 +1,3 @@
-# train_basket_transformer.py
-
 import os, json, random
 import torch
 import pandas as pd
