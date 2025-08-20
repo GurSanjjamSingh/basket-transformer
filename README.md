@@ -9,194 +9,282 @@
 
 ## 🎯 Project Overview
 
-This project demonstrates how transformer architectures can be adapted for grocery basket sequence prediction. Using a custom GPT-style model, we predict the next product a customer is likely to add to their basket based on their current items.
+This project demonstrates how transformer architectures can be adapted for grocery basket sequence prediction. Using a custom GPT-style model with **Focal Loss** for handling class imbalance, we predict the next product a customer is likely to add to their basket.
 
 **Key Features:**
-- 🚀 **Optimized for Apple Silicon** (M1/M2/M3 Macs)
-- 📊 **Balanced training data** with smart down-sampling
-- ⚡ **Fast training** (~2 hours on M2 Pro)
-- 🎯 **Real-world performance** with interpretable results
+- 🚀 **Apple Silicon Optimized** (MPS backend)
+- 📊 **Focal Loss** for imbalanced data handling
+- ⚖️ **Weighted Sampling** for head/tail balance
+- ⚡ **Fast Training** (~70 minutes on M2 Pro)
+- 🎯 **Real-world Performance** on 400K baskets
 
 ---
 
-## 🧠 Technical Architecture
+## 🧠 Model Architecture
 
-### Data Pipeline
-The project includes a sophisticated data preprocessing pipeline:
-
-1. **Data Shrinking**: Reduces vocabulary from 92K → 5K most frequent products
-2. **Balanced Sampling**: Down-samples popular items (20% kept) while preserving long-tail diversity
-3. **Smart Mapping**: Remaps product IDs to create efficient vocabulary
-4. **Target Sizing**: Produces ~400K training / ~50K validation samples
-
-### Model Configuration
-
-**Smoke Test (15 minutes):**
+### Core Configuration
 ```python
-emb_dim=128, n_heads=8, n_layers=3, batch_size=128
-context_length=25, vocab_size=5_000
+# Model specs (actual from code)
+vocab_size     = 5_000      # Top-5K products from Dunnhumby
+context_length = 30         # Sequence length
+emb_dim        = 128        # Embedding dimension  
+n_heads        = 8          # Multi-head attention
+n_layers       = 3          # Transformer layers
+drop_rate      = 0.05       # Minimal dropout
 ```
 
-**Full Training (~2 hours on M2 Pro):**
+### Key Innovations
+
+**1. Focal Loss Integration**
 ```python
-emb_dim=128, n_heads=8, n_layers=3, batch_size=96
-context_length=30, vocab_size=5_000, epochs=5
+# Handles class imbalance better than CrossEntropy
+from focal_loss_custom_04 import FocalLoss
+loss_fn = FocalLoss()  # Focus on hard examples
 ```
 
-**Advanced Features:**
-- ✅ **Learning Rate Warmup** with cosine decay
-- ✅ **Gradient Clipping** (norm=1.0) 
-- ✅ **AdamW Optimizer** with proper weight decay
-- ✅ **Layer Normalization** (pre-norm architecture)
-- ✅ **Early Stopping** with validation monitoring
-- ✅ **Smart Checkpointing** for long training runs
+**2. Smart Weighted Sampling**
+```python
+# Down-weight frequent products (0, 1, 2)
+head_ids = {0, 1, 2}  
+weights = [0.03 if y in head_ids else 1.0 for y in train_ds.targets]
+sampler = WeightedRandomSampler(weights, ...)
+```
 
-### Training Process
-
-The model uses next-token prediction with cross-entropy loss:
-
-1. **Sequence Processing**: Baskets → product ID sequences (max length 30)
-2. **Causal Masking**: Prevents future token leakage
-3. **Loss Calculation**: Cross-entropy on vocabulary predictions
-4. **Optimization**: AdamW with lr warmup + cosine decay
+**3. Efficient Data Pipeline**
+```python
+# Fast parquet loading with proper target handling
+df["target"] = df["target"].fillna(0).astype(int)
+# Pin memory for faster GPU transfer
+DataLoader(..., pin_memory=True, non_blocking=True)
+```
 
 ---
 
-## 📊 Results & Performance
+## 📊 Training Process
 
-### Training Metrics
-- **Training Time**: ~70 minutes (M2 Pro)
-- **Memory Usage**: ~2-3GB peak
-- **Convergence**: Stable loss decrease within 2-3 epochs
-- **Model Size**: ~1M parameters
+### Data Preparation
+The model uses the processed Dunnhumby dataset:
+- **Input**: `data/shrink_bal/train.parquet` (400K samples)
+- **Validation**: `data/shrink_bal/val.parquet` (50K samples)
+- **Format**: Each row contains `seq` (product sequence) and `target` (next product)
 
-### Prediction Quality
-The model demonstrates strong sequential learning:
+### Training Loop
+```python
+# Last-token prediction (GPT style)
+logits = model(x)[:, -1, :]  # Only predict next token
+loss = loss_fn(logits, y)    # Focal loss for imbalance
 
-**Example Prediction:**
+# Standard optimization
+optimizer.zero_grad()
+loss.backward()
+optimizer.step()
 ```
-Current Basket: ['ORGANIC BANANAS', 'GREEK YOGURT', 'WHOLE MILK']
-Top-3 Predictions: ['BREAD', 'EGGS', 'CHEESE']
-```
 
-**Performance Indicators:**
-- ✅ Coherent product relationships (dairy → bread/eggs)
-- ✅ No repetition of current basket items
-- ✅ Reasonable category associations
-- ✅ Stable training without overfitting
+### Performance Monitoring
+The training script tracks:
+- ✅ **Loss curves** (train/val plotted automatically)
+- ✅ **Memory usage** (optimized for M2 Pro)
+- ✅ **Training speed** (~4,167 steps/epoch)
+- ✅ **Model checkpointing** (saved to `checkpoints/`)
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### 1. Prerequisites
 ```bash
-# Required packages
-pip install torch pandas pyarrow tqdm matplotlib
+pip install torch pandas pyarrow matplotlib tqdm focal-loss-torch
 ```
 
-### 1. Data Preparation
-```bash
-# Download Dunnhumby dataset to data/ directory
-python data_preprocessing.py    # Creates splits
-python shrink_bal.py           # Balances & shrinks dataset
+### 2. Data Setup
+Ensure your data structure matches:
+```
+data/
+└── shrink_bal/
+    ├── train.parquet    # Training sequences
+    └── val.parquet      # Validation sequences
 ```
 
-### 2. Model Training
+### 3. Run Training
 ```bash
-# Smoke test (15 min)
-python train.py --config smoke_test_cfg.py
-
-# Full training (2 hours)  
-python train.py --config full_cfg.py
+python train_basket_transformer.py
 ```
 
-### 3. Inference
-```bash
-python predict.py --model checkpoints/best_model.pt
+**Expected Output:**
+```
+Training on mps | 400000 samples | 4167 steps/epoch | 20835 total steps
+Epoch 1/5: 100%|██████| 4167/4167 [14:32<00:00, loss=2.1234]
+Epoch 1 | train 2.1234 | val 2.0987
+...
+Training done. Model saved to checkpoints/basket_gpt.pt
+```
+
+### 4. Results
+- **Model**: Saved to `checkpoints/basket_gpt.pt`
+- **Config**: Saved to `checkpoints/config.json`
+- **Loss Plot**: Displayed automatically via matplotlib
+
+---
+
+## 📈 Expected Performance
+
+### Training Metrics
+Based on the actual implementation:
+
+| Metric | Value |
+|--------|--------|
+| **Training Time** | ~70 minutes (M2 Pro) |
+| **Memory Usage** | ~2-3GB peak |
+| **Model Size** | ~1M parameters |
+| **Steps/Epoch** | ~4,167 (400K/96 batch) |
+| **Convergence** | 2-3 epochs typically |
+
+### Health Indicators
+```python
+# What the code monitors:
+✅ GOOD: Train loss ↓, Val loss follows then plateaus, No NaN/inf
+⚠️  WARNING: Large train/val gap (>0.8), Loss oscillations
+❌ BAD: NaN losses, Memory errors, No improvement after 3 epochs
 ```
 
 ---
 
-## 📚 Dataset
+## 🔧 Code Structure
 
-**Source**: [Dunnhumby - The Complete Journey](https://www.kaggle.com/datasets/frtgnn/dunnhumby-the-complete-journey)
+### Main Components
 
-**Original Scale:**
-- 2M+ baskets from 2,500 households
-- 92,341 unique products
-- 2 years of transaction history
+**Dataset Class:**
+```python
+class BasketDataset(Dataset):
+    # Loads parquet files efficiently
+    # Handles missing targets (fillna(0))
+    # Returns (sequence, target) pairs
+```
 
-**Processed Scale:**
-- 400K training baskets
-- 50K validation baskets  
-- 5K most frequent products
-- Balanced head/tail distribution
+**Training Function:**
+```python
+def train():
+    # 1. Load datasets with weighted sampling
+    # 2. Initialize GPT model + Focal Loss
+    # 3. Training loop with last-token prediction
+    # 4. Validation evaluation
+    # 5. Model checkpointing
+```
 
 ### Key Files
 ```
-data/
-├── raw/
-│   ├── product.csv              # Product catalog
-│   └── transaction_data.csv     # Raw transactions
-├── splits/
-│   ├── train.parquet           # Training sequences
-│   └── val.parquet             # Validation sequences
-└── shrink_bal/
-    ├── train.parquet           # Balanced training data
-    ├── val.parquet             # Balanced validation data
-    └── id2product.json         # Product mapping
-```
-
----
-
-## 🛠️ Project Structure
-
-```
 basket-transformer/
-├── data_preprocessing.py       # Raw data → sequences
-├── shrink_bal.py              # Vocabulary shrinking & balancing
-├── smoke_test_cfg.py          # Quick test configuration
-├── full_cfg.py                # Full training configuration  
-├── model.py                   # Transformer implementation
-├── train.py                   # Training loop
-├── predict.py                 # Inference & examples
-├── utils.py                   # Helper functions
-└── README.md                  # This file
+├── train_basket_transformer.py    # Main training script (actual code)
+├── model_03.py                   # GPT model implementation
+├── focal_loss_custom_04.py       # Focal loss for imbalance
+├── data/shrink_bal/              # Processed data
+└── checkpoints/                  # Model outputs
 ```
 
 ---
 
-## 💡 Key Innovations
+## ⚙️ Configuration Details
 
-### 1. **Smart Data Balancing**
-Instead of naive sampling, we:
-- Identify actual top-3 frequent items after vocabulary remapping
-- Down-sample only these items (20% kept)
-- Preserve all long-tail diversity
-- Apply global caps to meet target dataset sizes
+### Current Settings (from code)
+```python
+# Optimized for 2-hour M2 Pro training
+batch_size = 96          # Larger batches = fewer steps
+lr = 3e-4               # Higher LR for faster convergence  
+num_epochs = 5          # Sufficient for convergence
+eval_every = 400        # Infrequent evaluation for speed
+patience = 2            # Quick early stopping
+```
 
-### 2. **Apple Silicon Optimization**
-- MPS backend compatibility (no mixed precision)
-- Memory-efficient batch sizes
-- Conservative model sizing for 2-hour training constraint
-- Proper gradient clipping for MPS stability
-
-### 3. **Production-Ready Training**
-- Learning rate warmup prevents early instability
-- Cosine decay maintains performance through training
-- Early stopping prevents overfitting
-- Smart checkpointing for recovery
-
----
-
-## 🎯 Future Improvements
-
-- [ ] **Larger Models**: Scale to 6-12 layers with more GPU/memory
-- [ ] **Advanced Architectures**: Try RoPE, Flash Attention, or Mamba
-- [ ] **Better Features**: Include price, category, seasonality data
-- [ ] **Evaluation Metrics**: Implement BLEU, diversity metrics
-- [ ] **Production Deployment**: Add inference API and model serving
+### Class Imbalance Handling
+```python
+# Smart weighting strategy
+head_ids = {0, 1, 2}    # Most frequent products
+weights = [0.03 if y in head_ids else 1.0 for y in targets]
+# Result: 97% down-sampling of frequent items
+```
 
 ---
 
+## 📊 Data Pipeline
+
+### Input Format
+```python
+# Expected parquet structure:
+df.columns = ['seq', 'target']
+# seq: List of product IDs [1, 45, 123, ...]  
+# target: Next product ID (int)
+```
+
+### Data Loading
+```python
+# Efficient loading with proper types
+df["target"] = df["target"].fillna(0).astype(int)
+# Fast GPU transfer
+DataLoader(..., pin_memory=True, non_blocking=True)
+```
+
+---
+
+## 🎯 Model Outputs
+
+### Training Artifacts
+After training completes:
+```
+checkpoints/
+├── basket_gpt.pt       # Model state dict
+└── config.json         # Training configuration
+```
+
+### Loss Visualization
+The script automatically generates:
+- **Training loss curve** (blue line)
+- **Validation loss curve** (orange line)  
+- **Matplotlib display** showing convergence
+
+---
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**Memory Errors:**
+```python
+# Reduce batch size if OOM
+batch_size = 64  # instead of 96
+```
+
+**Slow Training:**
+```python
+# Increase batch size if memory allows
+batch_size = 128  # faster convergence
+```
+
+**Loss Not Decreasing:**
+```python
+# Check data loading
+print(f"Train samples: {len(train_ds)}")
+print(f"Unique targets: {len(set(train_ds.targets))}")
+```
+
+### Expected Behavior
+- **Epoch 1**: Loss should drop significantly (>50% reduction)
+- **Epoch 2-3**: Gradual improvement with validation tracking train
+- **Epoch 4-5**: Convergence with possible early stopping
+
+---
+
+## 📝 Next Steps
+
+### Immediate Improvements
+- [ ] Add **learning rate scheduling** (warmup + cosine decay)
+- [ ] Implement **gradient clipping** for stability
+- [ ] Add **top-k accuracy** metrics beyond loss
+- [ ] Include **inference script** for basket predictions
+
+### Advanced Features
+- [ ] **Beam search** for multiple predictions
+- [ ] **Attention visualization** for interpretability  
+- [ ] **A/B testing framework** for model comparison
+- [ ] **Production API** for real-time inference
+
+---
