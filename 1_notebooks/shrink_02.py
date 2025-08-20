@@ -86,15 +86,3 @@ for split, path in zip(["train", "val"], [train_path, val_path]):
 json.dump(new_id2product, open(os.path.join(out_dir, "id2product.json"), "w"), indent=2)
 print("New vocab size:", len(new_id2product))
 
-
-'''Down-sample the head (top-3 most frequent targets) to 20%
-Calculate remaining budget = target_size - head_size_after_downsampling
-Thin the tail by randomly sampling to fit within the remaining budget
-Show clear logging of before/after counts for both head and tail
-
-This should give you:
-
-~400k train rows (156k head + 244k tail)
-~50k val rows (21k head + 29k tail)
-
-The tail thinning ensures you hit your target dataset sizes while maintaining the balanced distribution from the head down-sampling.'''
