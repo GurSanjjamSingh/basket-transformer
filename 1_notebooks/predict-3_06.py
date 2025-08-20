@@ -216,7 +216,7 @@ if __name__ == "__main__":
     main()
 
 
-'''🎯 Key Improvements:
+'''
 📋 Category Organization:
 
 Groups identical items (like "VEGETABLES - SHELF STABLE") into ranges
@@ -232,16 +232,16 @@ Shows format like: 🥕 VEGETABLES - SHELF STABLE (297-64830) Examples: 297, 298
 🥤 Beverages
 📦 Other items
 
-💡 Smart Display:
+Smart Display:
 
 Shows category ranges instead of hundreds of duplicate lines
 Provides sample IDs and total count for each category
 Users can pick ANY number within the range
 Shows category context when items are selected
 
-🔍 Enhanced Predictions:
+Predictions:
 
-Shows 8 top suggestions instead of 5
+Shows 8 top suggestions 
 Displays category for each predicted item
 Clear hierarchy with item → category structure
 
