@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 from model_03 import GPTModel
-from focal_loss_custom_04 import FocalLoss   # pip install focal-loss-torch
+from focal_loss_custom_04 import FocalLoss   
 
 # === smoke_test_cfg.py ===
 import torch
@@ -28,7 +28,6 @@ import torch
     num_epochs     = 5,          
     device         = 'mps',
     
-    # CRITICAL MISSING FEATURES ADDED:
     # 1. Learning rate scheduling (essential for transformers)
     use_lr_warmup  = True,
     warmup_steps   = 100,        # warmup over first 100 steps
@@ -77,7 +76,6 @@ import torch
     init_std       = 0.02,       # standard deviation for weight init
 )'''
 
-# What to look for in smoke test:
 # ✅ GOOD SIGNS:
 # - Train loss decreases smoothly
 # - Val loss decreases initially, then plateaus/slightly increases
@@ -93,10 +91,9 @@ import torch
 # - Loss explodes to NaN (gradient explosion)
 # - Very slow convergence (lr too low or model too small)
 
-# ---------- full hyper-parameters (commented) ----------
-# EVEN FASTER 2-HOUR CONFIG:
+# ---------- full hyper-parameters ----------
 CFG = dict(
-    # Aggressive size reduction
+    # size reduction
     vocab_size     = 5_000,
     context_length = 30,         # shorter sequences
     emb_dim        = 128,        # smaller model (128/8 = 16 per head)
@@ -153,16 +150,8 @@ CFG = dict(
     init_std       = 0.02,
 )
 
-# FAST CONFIG CALCULATIONS:
-# Model: 128 emb × 3 layers = ~1M parameters
-# Memory: ~2-3GB peak
-# Steps per epoch: 400k / 96 = ~4,167 steps  
-# Time per step: ~0.2s (smaller model)
-# Time per epoch: 4,167 × 0.2s = ~14 minutes
-# Total for 5 epochs: ~70 minutes = 1.2 hours ✅
 
-
-# HEALTH CHECKS - These should be verified:
+# These should be verified - Health Checkups:
 assert CFG['emb_dim'] % CFG['n_heads'] == 0, "emb_dim must be divisible by n_heads"
 assert CFG['lr'] > 0, "Learning rate must be positive"
 assert 0 <= CFG['drop_rate'] <= 1, "Dropout rate must be between 0 and 1"
@@ -174,7 +163,7 @@ train_losses, val_losses = [], []
 class BasketDataset(Dataset):
     def __init__(self, parquet_path, sample_frac=0.05):
         df = pd.read_parquet(parquet_path)          #.sample(frac=sample_frac, random_state=42)
-        df = df.copy()  # avoid chained assignment warnings
+        df = df.copy()  
         df["target"] = df["target"].fillna(0).astype(int)
         self.seqs    = df["seq"].tolist()
         self.targets = df["target"].tolist()
@@ -271,7 +260,6 @@ SUCCESS_CRITERIA = dict(
     reasonable_speed   = True,    # not too slow
 )
 
-# What to watch for:
 print("🔍 SMOKE TEST MONITORING:")
 print("✅ GOOD: Train loss ↓, Val loss follows then plateaus, No NaN/inf")
 print("⚠️  WARNING: Large train/val gap (>0.8), Loss oscillations, Slow convergence")
