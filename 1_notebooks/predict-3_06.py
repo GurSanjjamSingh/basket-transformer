@@ -1,5 +1,3 @@
-# predict_interactive.py
-
 import torch, json, pandas as pd
 from model_03 import GPTModel
 from collections import defaultdict
